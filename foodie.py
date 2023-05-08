@@ -1,12 +1,37 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Tue Apr 25 19:15:02 2023
+ECE579 Group 17
 
-@author: kama
 """
 
 import heapq
+
+class Item:
+    def init(self, size, fragile, freeze):
+        self.size = 0
+        self.fragile = False
+        self.freeze = False
+        
+# class Bag:
+#     def __init__(self, bag_type, max_items):
+#         self.bag_type = bag_type
+#         self.max_items = max_items
+#         self.items = []
+
+#     def can_add_item(self, item):
+#         if len(self.items) < self.max_items:
+#             if self.bag_type == "freezer" and item[1] == "frozen":
+#                 return True
+#             elif self.bag_type == "paper" and item[1] != "frozen":
+#                 return True
+#         return False
+
+#     def add_item(self, item):
+#         if self.can_add_item(item):
+#             self.items.append(item)
+#             return True
+#         return False
 
 class PathwaySystem:
     def __init__(self, width, height, obstacles=None):
@@ -131,16 +156,16 @@ class DeliveryRobot:
     def has_order(self):
         return len(self.compartment) > 0
 
-    def pick_and_bag_items(self, order):
-        if self.at_warehouse():
-            # Simulate the process of picking and bagging items
-            print(f"Robot at ({self.x}, {self.y}): Picking and bagging items for Order {order.id}")
-            bagged_order = order.copy()
-            bagged_order.is_bagged = True
-            return bagged_order
-        else:
-            print(f"Robot at ({self.x}, {self.y}): Cannot pick and bag items outside the warehouse")
-            return None
+    # def pick_and_bag_items(self, order):
+    #     if self.at_warehouse():
+    #         # Simulate the process of picking and bagging items
+    #         print(f"Robot at ({self.x}, {self.y}): Picking and bagging items for Order {order.id}")
+    #         bagged_order = order.copy()
+    #         bagged_order.is_bagged = True
+    #         return bagged_order
+    #     else:
+    #         print(f"Robot at ({self.x}, {self.y}): Cannot pick and bag items outside the warehouse")
+    #         return None
         
     def unload_orders(self, orders):
         for order in orders:
@@ -152,12 +177,13 @@ class DeliveryRobot:
         if (self.x, self.y) == order.destination:
             order.is_delivered = True
             self.drop()
-
+            
     def deliver_orders(self, orders):
         self.assign_orders_to_robots(orders)
     
         for robot in self.robots:
-            if robot.current_order:
+            while robot.orders:
+                robot.current_order = robot.orders.pop(0)
                 path_to_destination = robot.find_path((robot.x, robot.y), robot.current_order.destination)
                 if path_to_destination:
                     print(f"Robot {robot.id} found a path to the destination")
@@ -165,14 +191,8 @@ class DeliveryRobot:
                     robot.deliver_order(robot.current_order)
                 else:
                     print(f"Robot {robot.id} could not find a path to the destination")
-            else:
-                print(f"Robot {robot.id} has no assigned order")
-
-    # def deliver_orders(self):
-    #     for order in self.compartment:
-    #         if (self.x, self.y) == order.destination:
-    #             order.is_delivered = True
-    #             self.compartment.remove(order)
+            robot.current_order = None
+            print(f"Robot {robot.id} has completed all assigned orders")
 
     def deliver_multiple_orders(self, orders):
         self.load_orders(orders)
@@ -307,6 +327,7 @@ class DeliverySystem:
         order = Order(items, destination)
         self.orders.append(order)
         
+    
     def assign_orders_to_robots(self, orders):
         orders_queue = orders[:]
         robots_queue = self.robots[:]
@@ -322,51 +343,54 @@ class DeliverySystem:
     
             if robot is not None:
                 if robot.battery_level < robot.battery_capacity * 0.2:
+                    print(f"Robot {robot.id} recharge")
                     robot.recharge()
                 else:
                     robot.compartment.append(order)
                     print(f"Order {order.id} assigned to Robot {robot.id}")
-                    robots_queue.remove(robot)
+                    if len(robot.compartment) >= robot.compartment_capacity:
+                        robots_queue.remove(robot)
             else:
                 break
 
-    def bag_items(self, items):
-        sorted_items = sorted(items, key=lambda x: x[1], reverse=True)  # Sort items by size
-        freezer_bags = [Bag("freezer", 3) for _ in range(self.num_robots)]  # Assuming 3 items max per freezer bag
-        paper_bags = [Bag("paper", 3) for _ in range(self.num_robots)]  # Assuming 3 items max per paper bag
+    # def bag_items(self, items):
+    #     sorted_items = sorted(items, key=lambda x: x[1], reverse=True)  # Sort items by size
+    #     freezer_bags = [Bag("freezer", 3) for _ in range(self.num_robots)]  # Assuming 3 items max per freezer bag
+    #     paper_bags = [Bag("paper", 3) for _ in range(self.num_robots)]  # Assuming 3 items max per paper bag
 
-        for item in sorted_items:
-            item_bagged = False
-            for bag in freezer_bags + paper_bags:
-                if bag.add_item(item):
-                    item_bagged = True
-                    break
+    #     for item in sorted_items:
+    #         item_bagged = False
+    #         for bag in freezer_bags + paper_bags:
+    #             if bag.add_item(item):
+    #                 item_bagged = True
+    #                 break
 
-            if not item_bagged:
-                print(f"Unable to bag item {item[0]}")
+    #         if not item_bagged:
+    #             print(f"Unable to bag item {item[0]}")
 
-        return freezer_bags, paper_bags
-                        
+    #     return freezer_bags, paper_bags
+
     def deliver_orders(self, orders):
         self.assign_orders_to_robots(orders)
-        
-        while any(order for robot in self.robots for order in robot.compartment):
-           for robot in self.robots:
-               if not robot.current_order and robot.compartment:
-                   robot.current_order = robot.compartment.pop(0)
-               
-               if robot.current_order is not None:
-                   print(f"Robot {robot.id} has order {robot.current_order.id} assigned.")
-                   path_to_destination = robot.find_path((robot.x, robot.y), robot.current_order.destination)
-                   print(f"Robot {robot.id} found path to destination: {path_to_destination}")
-                   robot.move_to_destination(path_to_destination)
-                   print(f"Robot {robot.id} delivered order {robot.current_order.id} and is now at location {robot.x}, {robot.y}")
-                   path_to_warehouse = robot.find_path((robot.x, robot.y), self.warehouse_location)
-                   print(f"Robot {robot.id} found path back to warehouse: {path_to_warehouse}")
-                   robot.move_to_destination(path_to_warehouse)
-                   print(f"Robot {robot.id} returned to warehouse and is now at location {robot.x}, {robot.y}")
-                   robot.current_order = None
-            
+    
+        while any(robot.compartment for robot in self.robots):
+            for robot in self.robots:
+                while robot.compartment:
+                    if not robot.current_order:
+                        robot.current_order = robot.compartment.pop(0)
+    
+                    if robot.current_order is not None:
+                        print(f"Robot {robot.id} has order {robot.current_order.id} assigned.")
+                        path_to_destination = robot.find_path((robot.x, robot.y), robot.current_order.destination)
+                        print(f"Robot {robot.id} found path to destination: {path_to_destination}")
+                        robot.move_to_destination(path_to_destination)
+                        print(f"Robot {robot.id} delivered order {robot.current_order.id} and is now at location {robot.x}, {robot.y}")
+                        robot.current_order = None
+    
+                path_to_warehouse = robot.find_path((robot.x, robot.y), self.warehouse_location)
+                print(f"Robot {robot.id} found path back to warehouse: {path_to_warehouse}")
+                robot.move_to_destination(path_to_warehouse)
+                print(f"Robot {robot.id} returned to warehouse and is now at location {robot.x}, {robot.y}")
 
     def assign_order(self, order):
         min_path_length = float("inf")
@@ -403,27 +427,6 @@ class DeliverySystem:
                 robot.charge_battery(charge_amount)
 
 
-class Bag:
-    def __init__(self, bag_type, max_items):
-        self.bag_type = bag_type
-        self.max_items = max_items
-        self.items = []
-
-    def can_add_item(self, item):
-        if len(self.items) < self.max_items:
-            if self.bag_type == "freezer" and item[1] == "frozen":
-                return True
-            elif self.bag_type == "paper" and item[1] != "frozen":
-                return True
-        return False
-
-    def add_item(self, item):
-        if self.can_add_item(item):
-            self.items.append(item)
-            return True
-        return False
-
-
 
 def main():
     # Parameters
@@ -433,19 +436,19 @@ def main():
     compartment_capacity = 2
     num_robots = 3
 
-    items1 = [("Item A", 2), ("Item B", 3)]
-    items2 = [("Item C", 1), ("Item D", 4)]
-    items3 = [("Item E", 2), ("Item F", 5)]
-    items4 = [("Item G", 2), ("Item H", 3)]
-    items5 = [("Item I", 1), ("Item J", 4)]
-    items6 = [("Item K", 2), ("Item L", 5)]
+    items1 = [("banana", 2), ("apple", 3)]
+    items2 = [("grapes", 1), ("coconut", 4)]
+    items3 = [("broccoli", 2), ("pizza", 5)]
+    items4 = [("pear", 2), ("blueberries", 3)]
+    items5 = [("strawberry", 1), ("orange", 4)]
+    items6 = [("ice cream", 2), ("chocolate", 5)]
 
     order1 = Order(items1, (3, 3))
-    order2 = Order(items2, (1, 1))
+    order2 = Order(items2, (4, 1))
     order3 = Order(items3, (2, 3))
-    order4 = Order(items4, (0, 3))
-    order5 = Order(items5, (1, 3))
-    order6 = Order(items6, (2, 1))
+    order4 = Order(items4, (0, 9))
+    order5 = Order(items5, (7, 3))
+    order6 = Order(items6, (2, 5))
 
     # Create the pathway system
     pathway = PathwaySystem(*grid_size)
@@ -455,19 +458,6 @@ def main():
 
     # Create some example orders with unique IDs and destinations
     orders = [order1, order2, order3, order4, order5, order6]
-
-    # Assign and deliver the orders using the delivery system
-    # delivery_system.deliver_orders(orders)
-    
-    delivery_system.receive_order(items1, (3, 3))
-    delivery_system.receive_order(items2, (4, 4))
-    delivery_system.receive_order(items3, (4, 9))
-    delivery_system.receive_order(items4, (5, 7))
-    delivery_system.receive_order(items5, (1, 8))
-    delivery_system.receive_order(items6, (4, 6))
-
-     # Bag items
-    delivery_system.bag_items(items1 + items2 + items3)
 
     # Calculate paths for robots
     delivery_system.assign_orders_to_robots(orders)
